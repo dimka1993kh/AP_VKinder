@@ -1,4 +1,4 @@
-from functions import create_text_keyboard, add_next_button
+from functions import create_text_keyboard, add_next_button, age_verification, checking_number_in_str
 
 class TestVKBot:
     def setup(self):
@@ -114,3 +114,25 @@ class TestVKBot:
                                         "label":"Далее"}
                             }
                             ]]
+
+    def test_age_verification(self):
+        # Проверка минимального возраста
+        # Верный возраст
+        assert age_verification({'min_age' : 18}) == True
+        # Неверный возраст
+        assert age_verification({'min_age' : -10}) == False
+        # Проверка максимального возраста
+        # Верный возраст
+        assert age_verification({'max_age' : 25}, min_age=18) == True
+        # Неверный возраст
+        assert age_verification({'max_age' : 25}, min_age=35) == False
+
+    def test_checking_number_in_str(self):
+        # Проверка на положительное число
+        assert checking_number_in_str('250') == True
+        # Проверка на отрицательно число
+        assert checking_number_in_str('-167') == True
+        # Проверка слово
+        assert checking_number_in_str('слово') == False
+        # Проверка слово c '-'
+        assert checking_number_in_str('-не слово') == False
