@@ -4,20 +4,17 @@ from vk_bot import VkBot
 from random import randrange
 import json
 from pprint import pprint
+from token import group_token
 
 if __name__ == '__main__':
-    # API_group = 'bc7b925e1f917e1d09bc4ff42735cd75a48a79bfb41a49e21d7b6919f9c9fb72abe0f2984dcb473649d9f'
     
-
     def write_msg(user_id, result):
         pprint(result['keyboard'])
-        vk.method('messages.send', {'user_id': user_id, 'message': result['message'], 'random_id': randrange(10 ** 7), 'command' : 'start', 'keyboard' : json.dumps(result['keyboard'])})
+        vk.method('messages.send', {'user_id': user_id, 'message': result['message'], 'random_id': randrange(10 ** 7), 'command' : 'start', 'keyboard' : json.dumps(result['keyboard']), 'attachment' : result['mediafile']})
 
-    # API-ключ созданный ранее
-    token = "bc7b925e1f917e1d09bc4ff42735cd75a48a79bfb41a49e21d7b6919f9c9fb72abe0f2984dcb473649d9f"
 
     # Авторизуемся как сообщество
-    vk = vk_api.VkApi(token=token)
+    vk = vk_api.VkApi(token=group_token)
 
     # Работа с сообщениями
     longpoll = VkLongPoll(vk)
@@ -26,7 +23,6 @@ if __name__ == '__main__':
     my_dict = {
 
     }
-    
     print("Server started")
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW:
