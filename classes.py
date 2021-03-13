@@ -72,9 +72,8 @@ class VKUser():
                 'city' : self.search['city'], 
                 'fields' : 'country, city',
                 'can_access_closed ' : '1', 
-                # 'from_list' : 'friends',
                 'access_token' : self.user_access_token,
-                'v' : '5.89',
+                'v' : '5.130',
             }
         else:
             self.params_search = {}  
@@ -92,7 +91,7 @@ class VKUser():
 
 
 # Метод поиска по users.search
-    def search_people_by_users_search(self):
+    def search_people_by_users_search(self, removable_urls:list=None):
         # Поиск подходящих людей по всему интернету, не объективен
         count = 0
         result = {'response': {'count' : count, 'items' : []}}
@@ -100,20 +99,20 @@ class VKUser():
         resp = requests.get(self.api_urls_search, params=self.params_search)
         resp.raise_for_status()
         for person in resp.json()['response']['items']:
+            print(person)
             if count < 10:
                 person_result = {}
-                for el in info_list:
-                    if el in person.keys():
-                        person_result[el] = person[el]
-                    elif el == 'src':
-                        person_result[el] = self.get_person_url(person['id'])
-                    elif el == 'top_photo':
-                        person_result[el] = self.get_top_photo(person['id'])
-                if person_result[el] == ['Приватный профиль']:
-                    continue
-                else:
+                # Если полученный url пользователя находится в исключаемых url - его не записываем
+                if self.get_person_url(person['id']) not in removable_urls and self.get_top_photo(person['id']) != 'Приватный профиль':
+                    for el in info_list:
+                        if el == 'src':
+                            person_result[el] = self.get_person_url(person['id'])
+                        elif el == 'top_photo':
+                            person_result[el] = self.get_top_photo(person['id'])
+                        elif el in person.keys():
+                            person_result[el] = person[el]
                     count += 1
-                result['response']['items'].append(person_result)
+                    result['response']['items'].append(person_result)
             else:
                 break
         result['response']['count'] = len(result['response']['items'])
@@ -208,7 +207,7 @@ class VKUser():
         # print(resp.json())
         if 'error' in resp.json().keys():
             # print(f'https://vk.com/id{user_id}','Приватный профиль')
-            result.append('Приватный профиль')
+            return 'Приватный профиль'
         else:
             photos = resp.json()['response']['items']
             photos.sort(key=lambda photo: photo['likes']['count'], reverse = True)

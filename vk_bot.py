@@ -16,13 +16,14 @@ class VkBot:
         self._USER_SEX = get_user_sex(self._USER_ID)
         self.answers = {'marital_status' : [], 'correction' : False}
         self.count = 0
-        self.function_variable = 0
+        self.function_variable = []
         self.keyboard = VkKeyboard.get_empty_keyboard()
         self.marital_status_male = ['НЕ ЖЕНАТ', 'ВСТРЕЧАЮСЬ', 'ПОМОЛВЛЕН', 'ЖЕНАТ', 'В ГРАЖДАНСОКМ БРАКE', 'ВЛЮБЛЕН', 'ВСЕ СЛОЖНО', 'В АКТИВНОМ ПОИСКЕ']
         self.marital_status_female = ['НЕ ЗАМУЖЕМ', 'ВСТРЕЧАЮСЬ', 'ПОМОЛВЛЕНА', 'ЗАМУЖЕМ', 'В ГРАЖДАНСОКМ БРАКE', 'ВЛЮБЛЕНА', 'ВСЕ СЛОЖНО', 'В АКТИВНОМ ПОИСКЕ']
         self.result = {'response': {'count': 0, 'items' : []}}
         self.person_photos = ''
         self.person_count = 0
+        self.removable_urls = []
         # Порядковый номер вопроса. Изменяется, когда пользователь ответил на вопрос. Используется для определения следующего вопроса
         self.control_questions = 0
     
@@ -108,7 +109,7 @@ class VkBot:
         # Поиск по друзьям друзей
         # result = VKUser(self._USER_ID, search_dict).search_pepople()
         # Поиск по всему ВК
-        result = VKUser(self._USER_ID, search_dict).search_people_by_users_search()
+        result = VKUser(self._USER_ID, search_dict).search_people_by_users_search(self.removable_urls)
         return result
     # Метод возвращения исключения
     def new_message_exception(self):
@@ -155,7 +156,10 @@ class VkBot:
         self.person_count += 1
 
         return {'bot_answer' : bot_answer, 'person_photos' : person_photos, 'keyboard' : keyboard}
-    
+    # Метод получения пользователей, которых мы будем исключать из повторного поиска
+    def get_removable_urls(self):
+        for person in self.result['response']['items']:
+            self.removable_urls.append(person['src'])   
     
     # Метод, позволяющий написать пользователя сообщение
     def new_message(self, message):
@@ -341,14 +345,14 @@ class VkBot:
                 self.write_answer(citi_list, 'city') 
 
                 # Используем count для того, чтобы при нажатии на кнопку города в if программа не начала искать город по номеру кнопки
-                self.count += 1
-
-                # Создадим клавиатуру
-                keyboard = self.create_keyboard()
+                self.count = 1
 
             elif not citi_list:
                 # Отреагируем на ответ пользовател
                 bot_answer = 'Такой город не найден. Проверь вводимые данные'
+
+                # Создадим клавиатуру
+                keyboard = self.create_keyboard()
             
             else:
                 # Создадим клавиатуру
@@ -360,16 +364,15 @@ class VkBot:
                 else:
                     keyboard = self.create_keyboard(zip(self.marital_status_female, colors))
 
-                self.keyboard = keyboard
-
                 # Зададим вопрос
                 bot_answer = f"В каком семейном положении находится человек?"
 
                 # Определимся со следующим сообщением на основании ответа
                 self.control_questions = 7
+
                 if self.count == 0:
                     self.write_answer(citi_list[0], 'city')
-                elif message in self.function_variable:
+                elif int(message) in self.function_variable:
                     self.answers['city'] = self.answers['city'][int(message) - 1]
                 else:
                     # Создадим клавиатуру
@@ -383,7 +386,7 @@ class VkBot:
                 print(1)
 
                 # Создадим клавиатуру
-                keyboard = self.create_keyboard([['Да', 'POSITIVE'], ['Начать сначала', 'NEGATIVE']])
+                keyboard = self.create_keyboard([['Да', 'POSITIVE'], ['НАЧАТЬ ПОИСК ЗАНОВО', 'NEGATIVE']])
 
                 # Определимся со следующим сообщением на основании ответа
                 self.control_questions = 100
@@ -412,13 +415,30 @@ class VkBot:
                 self.person_photos = data['person_photos']
                 keyboard = data['keyboard']
 
+        elif message.upper() == 'ПОСМОТРЕТЬ СЛЕДУЮЩИЕ 10 ВАРИАНТОВ':
+            # Находим url предыдущих пользователей
+            self.get_removable_urls()
+            self.person_photos = ''
+            self.person_count = 0
+            self.control_questions = 100
+            # Создадим клавиатуру
+            keyboard = self.create_keyboard([['Да', 'POSITIVE'], ['НАЧАТЬ ПОИСК ЗАНОВО', 'NEGATIVE']])
 
+            # Определимся со следующим сообщением на основании ответа
+            self.control_questions = 100
+
+            # Начнем поиск людей
+            # Функция search_people ищет пользователей по всему ВК
+            self.result = self.search_people()
+
+            # Зададим вопрос
+            bot_answer = f"Нашли тебе еще {self.result['response']['count']} вариантов. Начнем смотреть?"
 
         # Если пользователю никто не понравился, то начинаем поиск заново
         elif message.upper() == 'НАЧАТЬ ПОИСК ЗАНОВО':
 
-             # Создадим клавиатуру
-            keyboard = self.create_keyboard([['НАЧАТЬ', 'SECONDARY']])
+            # Создадим клавиатуру
+            keyboard = self.create_keyboard([['Начать', 'SECONDARY']])
 
             # Определимся со следующим сообщением на основании ответа
             self.control_questions = 0

@@ -139,6 +139,7 @@ def convert_data_for_message(object_vk_bot, number_person:int):
     bot_answer = f"{object_vk_bot.result['response']['items'][number_person]['first_name']} {object_vk_bot.result['response']['items'][number_person]['last_name']} \n {object_vk_bot.result['response']['items'][number_person]['src']}"
     person_photos = ''
     for photo in object_vk_bot.result['response']['items'][number_person]['top_photo']:
+        print('photo',photo)
         person_photos += f"photo{photo['user_id']}_{photo['photo_id']},"
     return {'bot_answer' : bot_answer, 'person_photos' : person_photos}
 
