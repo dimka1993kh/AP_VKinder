@@ -2,7 +2,7 @@ import requests
 import time
 from datetime import date
 from pprint import pprint
-from token import user_access_token
+from token_data import user_access_token
 
 class VKUser():
     def __init__(self, user_id, search:dict=None, user_access_token:str=user_access_token):
@@ -210,9 +210,9 @@ class VKUser():
             # print(f'https://vk.com/id{user_id}','Приватный профиль')
             result.append('Приватный профиль')
         else:
-            photos = resp.json()['response']['items'][:3]
+            photos = resp.json()['response']['items']
             photos.sort(key=lambda photo: photo['likes']['count'], reverse = True)
-            for photo in photos:
+            for photo in photos[:3]:
                 result.append({'user_id' : user_id, 'photo_id': photo['id'] ,'src' : photo['sizes'][-1]['url']})
         return result
 
@@ -248,3 +248,6 @@ search_dict = {
 
 # fff = VKUser('27771889', search_dict).search_pepople_in_friends()
 # pprint(fff)
+
+
+

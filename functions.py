@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 import re
 import math
 from pprint import pprint
@@ -28,10 +29,12 @@ def find_russia_cities(user_id):
 
 def find_citi_in_VK(user_id, citi):
     user = VKUser(user_id)
-    params = {
-            'q' : citi
-            }
-    citi = user.search_cities(params)['response']['items']
+    params = {'q' : citi}
+    citi = user.search_cities(params)
+    if 'error' not in citi:
+        citi = citi['response']['items']
+    elif citi['error']['error_code'] == 100:
+        citi = False
     return citi
 
 
@@ -143,3 +146,17 @@ def convert_data_for_message(object_vk_bot, number_person:int):
 
 # print(find_russia_cities('23890940'))
 
+
+
+
+def analize_color_button(color):
+    if color == 'NEGATIVE':
+        result = VkKeyboardColor.NEGATIVE
+    elif color == 'POSITIVE':
+        result = VkKeyboardColor.POSITIVE
+    elif color == 'PRIMARY':
+        result = VkKeyboardColor.PRIMARY
+    elif color == 'SECONDARY':
+        result = VkKeyboardColor.SECONDARY
+    return result
+    
