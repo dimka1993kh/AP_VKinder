@@ -99,22 +99,26 @@ class VKUser():
         resp = requests.get(self.api_urls_search, params=self.params_search)
         resp.raise_for_status()
         for person in resp.json()['response']['items']:
-            print(person)
-            if count < 10:
-                person_result = {}
-                # Если полученный url пользователя находится в исключаемых url - его не записываем
-                if self.get_person_url(person['id']) not in removable_urls and self.get_top_photo(person['id']) != 'Приватный профиль':
+            url = self.get_person_url(person['id'])
+            photo = self.get_top_photo(person['id'])
+            # Если полученный url пользователя находится в исключаемых url - его не записываем
+            if url in removable_urls or photo == False:
+                continue
+            else:
+                if count < 10:
+                    person_result = {}
                     for el in info_list:
                         if el == 'src':
-                            person_result[el] = self.get_person_url(person['id'])
+                            person_result[el] = url
                         elif el == 'top_photo':
-                            person_result[el] = self.get_top_photo(person['id'])
+                            person_result[el] = photo
                         elif el in person.keys():
                             person_result[el] = person[el]
                     count += 1
+                    # print('person_result', person_result)
                     result['response']['items'].append(person_result)
-            else:
-                break
+                else:
+                    break
         result['response']['count'] = len(result['response']['items'])
         return result
 # Метод поиска пар  
@@ -200,14 +204,14 @@ class VKUser():
         return result
 # Метод получения фотографий определенного пользователя
     def get_top_photo(self, user_id):
+        time.sleep(0.5)
         result = []
         additional_params = {'owner_id' : user_id}
         resp = requests.get(self.api_photos, params=self.params_get_photos | additional_params)
         resp.raise_for_status() 
         # print(resp.json())
-        if 'error' in resp.json().keys():
-            # print(f'https://vk.com/id{user_id}','Приватный профиль')
-            return 'Приватный профиль'
+        if 'error' in resp.json().keys() and resp.json()['error']['error_code'] == 30:
+            return False
         else:
             photos = resp.json()['response']['items']
             photos.sort(key=lambda photo: photo['likes']['count'], reverse = True)

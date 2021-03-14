@@ -1,3 +1,5 @@
 vk_api
 bs4
 pytest
+sqlalchemy
+psycopg2 

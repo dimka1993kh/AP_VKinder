@@ -6,6 +6,9 @@ from classes import VKUser
 from pprint import pprint
 from data import empty_keyboard
 import json
+from db.main import Base, engine, Session
+from db.models import Vkinder_result
+from sqlalchemy.sql.expression import func
 
 class VkBot:
     
@@ -113,7 +116,7 @@ class VkBot:
         return result
     # Метод возвращения исключения
     def new_message_exception(self):
-        return f"Я не понял твоего ответа."
+        return f"Я бот.Я не понял твоего ответа. Пожалуйста, ответь на вопрос."
     # Метод создания клавиатуры
     def create_keyboard(self, buttons_list:list=None):
         keyboard = VkKeyboard(one_time=True)
@@ -160,26 +163,63 @@ class VkBot:
     def get_removable_urls(self):
         for person in self.result['response']['items']:
             self.removable_urls.append(person['src'])   
-    
+    # Метод записи результата в базу данных PostgreSql
+    def write_to_bd(self):
+        # Инициализируем схему
+        Base.metadata.create_all(engine)
+        # Начнем сессию
+        session = Session()
+        # Определим индекс последнего элемента в db
+        max_id_in_db = session.query(func.max(Vkinder_result.id)).first()[0]
+        if max_id_in_db:
+            max_id = max_id_in_db
+        else:
+            max_id = 0
+        # Разберемся с фотографиями, так как не у всех есть 3 фотографии в профиле
+        for idx, person in enumerate(self.result['response']['items']):
+            photos = ['', '', '']
+            for photo_idx, photo_src in enumerate(person['top_photo']):
+                photos[photo_idx] = photo_src['src']
+            # Запишем результат в таблицу
+            result = Vkinder_result(id=max_id + idx + 1, first_name=person['first_name'], last_name=person['last_name'], link=person['src'], photo_1=photos[0], photo_2=photos[1], photo_3=photos[2])
+            session.add(result)
+        session.commit()
+
+        # yesterday = db.session.query(db.func.max(Setting.count)).first()[0]
+
     # Метод, позволяющий написать пользователя сообщение
     def new_message(self, message):
         
         print('message', message)
-        if message.upper() == 'НАЧАТЬ':
-            # Создадим клавиатуру
-            keyboard = VkKeyboard(one_time=True)
-            keyboard.add_button('Да', color=VkKeyboardColor.POSITIVE)
-            keyboard.add_button('Нет', color=VkKeyboardColor.NEGATIVE)
-            keyboard = keyboard.get_keyboard()
 
-            # Запишем клавиатуру в переменную на случай, если нам нужно будет ее сновь показать
-            self.keyboard = keyboard
+
+        # Получение ответов пользователя для отладки
+        if message == '!':
+            self.print_answers()
+            bot_answer = f'Написал твои ответы. Это нужно только для отладки :).'
+            keyboard = VkKeyboard.get_empty_keyboard()
+
+        elif message.upper() == 'НАЧАТЬ':
+            # Создадим клавиатуру
+            # keyboard = self.create_keyboard([['Да', 'POSITIVE'], ['Нет, NEGATIVE']])
+            keyboard = self.create_keyboard([['Да', 'POSITIVE'], ['Нет', 'NEGATIVE']])
+            # keyboard.add_button('Да', color=VkKeyboardColor.POSITIVE)
+            # keyboard.add_button('Нет', color=VkKeyboardColor.NEGATIVE)
+            # keyboard = keyboard.get_keyboard()
 
             # Определимся со следующим сообщением на основании ответа
             self.control_questions = 1
 
             # Зададим вопрос
             bot_answer = f"Привет, {self._USERNAME}! Я чат-бот сообщества 'VKinder'. Помогу тебе найти себе пару.\n Хочешь уточнить параметры поиска?"
+
+        elif self.control_questions == 0:
+            if message.upper() != 'НАЧАТЬ':
+                # Создадим клавиатуру
+                keyboard = self.create_keyboard()
+
+                # Отреагируем на ответ пользователя
+                bot_answer = self.new_message_exception()
             
         # Если пользователь начал общение с ботом
         elif self.control_questions == 1:
@@ -228,6 +268,7 @@ class VkBot:
                 # Начнем поиск людей
                 # Функция search_people ищет пользователей по всему ВК
                 self.result = self.search_people()
+                self.write_to_bd()
 
                 # Создадим клавиатуру
                 keyboard = self.create_keyboard([['Да', 'POSITIVE'], ['Начать сначала', 'NEGATIVE']])
@@ -395,6 +436,8 @@ class VkBot:
                 # Начнем поиск людей
                 # Функция search_people ищет пользователей по всему ВК
                 self.result = self.search_people()
+                self.write_to_bd()
+
 
                 # Зададим вопрос
                 bot_answer = f"Нашли тебе {self.result['response']['count']} вариантов. Начнем смотреть?"
@@ -430,6 +473,7 @@ class VkBot:
             # Начнем поиск людей
             # Функция search_people ищет пользователей по всему ВК
             self.result = self.search_people()
+            self.write_to_bd()
 
             # Зададим вопрос
             bot_answer = f"Нашли тебе еще {self.result['response']['count']} вариантов. Начнем смотреть?"
@@ -455,11 +499,4 @@ class VkBot:
 
             # Покажем пользователю количество пар, не превышающее self.result['response']['count']
         
-        # Получение ответов пользователя для отладки
-        elif message == '!':
-            self.print_answers()
-            bot_answer = f'Написал твои ответы. Это нужно только для отладки :).'
-            keyboard = VkKeyboard.get_empty_keyboard()
-
-
         return {'message' : bot_answer, 'keyboard' : keyboard, 'mediafile' : self.person_photos}
