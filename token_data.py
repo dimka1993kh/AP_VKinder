@@ -1,3 +1,0 @@
-# API-ключ созданный ранее
-group_token = "bc7b925e1f917e1d09bc4ff42735cd75a48a79bfb41a49e21d7b6919f9c9fb72abe0f2984dcb473649d9f"
-user_access_token = 'cc595861123ea5d236a51ae77afa72040ec7443148210525007977c5b0292e979b7d0e6f0eb5d139ea226'
