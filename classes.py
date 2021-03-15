@@ -4,7 +4,7 @@ from datetime import date
 from token_data import user_access_token
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from bs4 import BeautifulSoup
-from functions import create_text_keyboard, add_next_button, age_verification, checking_number_in_str, get_user_sex, checking_city_entries, find_russia_cities, find_citi_in_VK, convert_data_for_message, opposite_sex, analize_color_button, max_id_in_db
+from functions import analize_color_button, max_id_in_db, convert_data_for_message, age_verification
 from data import empty_keyboard
 import json
 from db.main import Base, engine
@@ -73,7 +73,8 @@ class VKUser():
             }
         else:
             self.params_search = {}  
-     
+    
+
     # Метод поиска пола пользователя
     def find_sex(self):
         resp = requests.get(self.api_urls_get, params=self.params_get)
@@ -85,7 +86,6 @@ class VKUser():
         resp.raise_for_status()
         return resp.json()['response'][0]['city']
 
-
     # Метод поиска по users.search
     def search_people_by_users_search(self, removable_urls:list=None):
         # Поиск подходящих людей по всему интернету, не объективен
@@ -96,9 +96,12 @@ class VKUser():
         resp.raise_for_status()
         for person in resp.json()['response']['items']:
             url = self.get_person_url(person['id'])
-            photo = self.get_top_photo(person['id'])
             # Если полученный url пользователя находится в исключаемых url - его не записываем
-            if url in removable_urls or photo == False:
+            photo = self.get_top_photo(person['id'])
+            if removable_urls:
+                if url in removable_urls:
+                    continue
+            if photo == False:
                 continue
             else:
                 if count < 10:
@@ -115,57 +118,7 @@ class VKUser():
                 else:
                     break
         result['response']['count'] = len(result['response']['items'])
-        return result
-    # Метод поиска пар  
-    def search_pepople(self):
-
-        # Поиск будем весьи следующим образом:
-        # Найдем всех друзей пользователя (если они закрыты, предупредим пользователя, что поиск будет вестись по всему ВК, что усложнит поис ПОДХОДЯЩЕЙ пары)
-        # У каждого друга найдем всех друзей по заданным параметрам ( таким образом обеспечим пользователю доступ к друзьям друзей, близкий круг общения)
-        # Если этого окажется мало, можно капнуть еще глубже - в друзья друзей друзей
-
-        result = {'response': {'items' : []}}
-        info_list = ['first_name', 'last_name', 'country', 'city', 'src', 'top_photo']
-        resp = requests.get(self.api_urls_search, params=self.params_search)
-        resp.raise_for_status()
-        friends_ids = self.get_friends_ids()
-        all_friends_friends = []
-        for el in friends_ids:
-            time.sleep(0.5)
-            for person in VKUser(str(el), self.search).search_pepople_in_friends():
-                all_friends_friends.append(person)
-
-        for person in all_friends_friends:
-            person_result = {}
-            for el in info_list:
-                if el in person.keys():
-                    person_result[el] = person[el]
-                elif el == 'src':
-                    person_result[el] = self.get_person_url(person['id'])
-                elif el == 'top_photo':
-                    person_result[el] = self.get_top_photo(person['id'])
-            result['response']['items'].append(person_result)
-        return result
-
-    def get_friends_ids(self):
-        result = []
-        additional_params = {'offset' :  0,}
-        num_offset = 5000
-        while num_offset == 5000:
-            resp = requests.get(self.api_get_friends, params=self.params_get_friends | additional_params)
-            resp.raise_for_status() 
-            for user_id in resp.json()['response']['items']:
-                result.append(user_id)
-            num_offset = resp.json()['response']['count']
-        return result
-    # Поиск по параметрам среди друзей
-    def search_pepople_in_friends(self):
-        result = []
-        resp = requests.get(self.api_urls_search_in_friends, params=self.params_search)
-        resp.raise_for_status()
-        for el in resp.json()['response']['items']:
-            if 'error' not in el.keys():
-                result.append(el)
+        print(result)
         return result
 
     # Метод получения ссылки на профиль
@@ -173,9 +126,11 @@ class VKUser():
         url_part = 'https://vk.com/id'
         result = url_part + str(person_id)
         return result
+    
     # Метод получения фотографий определенного пользователя
     def get_top_photo(self, user_id):
         time.sleep(0.5)
+        print('get_top_photo')
         result = []
         additional_params = {'owner_id' : user_id}
         resp = requests.get(self.api_photos, params=self.params_get_photos | additional_params)
@@ -189,14 +144,10 @@ class VKUser():
                 result.append({'user_id' : user_id, 'photo_id': photo['id'] ,'src' : photo['sizes'][-1]['url']})
         return result
 
-    # Поиск всех городов
+        # Поиск всех городов
+    
+    # Метод поиска города
     def search_cities(self, params):
-        resp = requests.get(self.api_urls_search_cities, params=self.params_search_cities | params)
-        resp.raise_for_status() 
-        return resp.json()
-
-    # Поиск конкретного города
-    def search_citi(self, params):
         resp = requests.get(self.api_urls_search_cities, params=self.params_search_cities | params)
         resp.raise_for_status() 
         return resp.json()
@@ -208,7 +159,7 @@ class VkBot:
         self._USER_ID = user_id
         self._USERNAME = self._get_user_name_from_vk_id(user_id)[0]
         self._LASTNAME = self._get_user_name_from_vk_id(user_id)[1]
-        self._USER_SEX = get_user_sex(self._USER_ID)
+        self._USER_SEX = self.get_user_sex()
         self.answers = {'marital_status' : [], 'correction' : False}
         self.count = 0
         self.function_variable = []
@@ -223,6 +174,28 @@ class VkBot:
         self.control_questions = 0
         self.count_create_bd = 0
     
+    def find_citi_in_VK(self, user_id, city):
+        user = VKUser(user_id)
+        params = {'q' : city}
+        cities = user.search_cities(params)
+        if cities['response']['count'] != 0:
+            cities = cities['response']['items']
+        else:
+            cities = False
+        return cities
+
+
+    def opposite_sex(self):
+        if self._USER_SEX == 1:
+            return '2'
+        elif self._USER_SEX == 2:
+            return '1'
+        else:
+            raise Exception('Введен невенрый пол. Должно быть значение 1 (ж) или 2 (м)')
+
+    def get_user_sex(self):
+        return VKUser(self._USER_ID).find_sex()
+        
     # Метод, возвращающий username по id
     def _get_user_name_from_vk_id(self, user_id):
         request = requests.get("https://vk.com/id"+str(user_id))
@@ -240,27 +213,6 @@ class VkBot:
         self.count = 0
         self.function_variable = 0
         
-    # Метод для очистки от ненужных тэгов
-    @staticmethod
-    def _clean_all_tag_from_str(string_line):
-        """
-        Очистка строки stringLine от тэгов и их содержимых
-        :param string_line: Очищаемая строка
-        :return: очищенная строка
-        """
-        result = ""
-        not_skip = True
-        for i in list(string_line):
-            if not_skip:
-                if i == "<":
-                    not_skip = False
-                else:
-                    result += i
-            else:
-                if i == ">":
-                    not_skip = True
-        
-        return result
     # Метод, позволяющий сделать записть ответа пользователя
     def write_answer(self, message, question_name):
         if question_name in self.answers.keys() and isinstance(self.answers[question_name], list):
@@ -429,6 +381,7 @@ class VkBot:
             # Начнем поиск людей
             # Функция search_people ищет пользователей по всему ВК
             self.result = self.search_people()
+            self.get_removable_urls()
             self.write_to_bd()
 
             # Зададим вопрос
@@ -503,7 +456,7 @@ class VkBot:
                 # Зададим параметры для поиска
                 self.answers = {'marital_status' : ['6'],
                                 'age' : message,
-                                'sex' : opposite_sex(self._USER_SEX),
+                                'sex' : self.opposite_sex(),
                                 'min_age': int(message) - 3,
                                 'max_age': int(message) + 3,
                                 'city' : VKUser(self._USER_ID).find_city(),
@@ -541,10 +494,10 @@ class VkBot:
                     self.write_answer('1', 'sex')
                 
                 # Создадим клавиатуру
-                    keyboard = self.create_keyboard()
+                keyboard = self.create_keyboard()
                 
                 # Определимся со следующим сообщением на основании ответа
-                    self.control_questions = 4
+                self.control_questions = 4
 
                 # Зададим вопрос
                 bot_answer = f"Сколько минимум лет должно быть товей половинке?"
@@ -595,7 +548,6 @@ class VkBot:
                     bot_answer = f"В каком городе планируешь искать?"
 
                 else:
-
                     # Отреагируем на ответ пользователя
                     bot_answer = f"Максимальный возраст должен быть больше {self.answers['min_age']}. Введи верный возраст."
 
@@ -609,7 +561,7 @@ class VkBot:
         elif self.control_questions == 6:
 
             # Пробуем найти город
-            citi_list = find_citi_in_VK(self._USER_ID, message.upper())
+            citi_list = self.find_citi_in_VK(self._USER_ID, message.upper())
 
             # Если при проверке города в ВК имеется несколько таких городов, то просим пользователя уточнить наименование города
             if len(citi_list) > 1 and self.count == 0:
@@ -645,7 +597,7 @@ class VkBot:
                 colors = []
                 for status in self.marital_status_male:
                     colors.append('POSITIVE')
-                if self.answers['sex'] == 'male':
+                if self.answers['sex'] == '2':
                     keyboard = self.create_keyboard(zip(self.marital_status_male, colors))
                 else:
                     keyboard = self.create_keyboard(zip(self.marital_status_female, colors))
