@@ -3,10 +3,11 @@ import requests
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 import re
 import math
-from pprint import pprint
 from classes import VKUser
 import time
+from sqlalchemy.sql.expression import func
 
+# Функция поиска городов россии
 def find_russia_cities(user_id):
     result = []
     while_condition = 1000
@@ -26,7 +27,7 @@ def find_russia_cities(user_id):
         while_condition = len(cities_dict)
     return result
 
-
+# Функция поиска города в вк
 def find_citi_in_VK(user_id, citi):
     user = VKUser(user_id)
     params = {'q' : citi}
@@ -37,62 +38,15 @@ def find_citi_in_VK(user_id, citi):
         citi = False
     return citi
 
-
-
+# Функция проверки вхождения города в список городов
 def checking_city_entries(input_citi:str, func:dict):
     for citi in func:
         if input_citi in citi['title']:
             return {'check' : True,
                     'citi_info' : citi
                     }
-    # responce = requests.get('https://pynop.com/goroda.htm')
-    # responce.raise_for_status()
-    # responce.encoding = 'cp1251'
-    # soup = BeautifulSoup(responce.text, features="html.parser")
 
-    # data = soup.findAll('p', class_='MsoNormal')
-    # result = []
-    # for el in data:
-    #     city = re.match(r"\D+", el.text.split()[0])
-    #     if city:
-    #         result.append(city.group(0).upper())
-    # return result[: -2]
-# Параметры для поиска списка всех городов
-        
-
-def create_text_keyboard(label_list: list):
-    rows = math.ceil(len(label_list) / 4) 
-    num_buttons_on_row = 0
-    row_result = []
-    result = []
-    for idx, label in enumerate(label_list):
-        if num_buttons_on_row < 4:
-            num_buttons_on_row += 1
-            row_result.append({
-                            "action":{
-                                        "type":"text",
-                                        "label":f"{label}"
-                                        }
-                            }) 
-        if num_buttons_on_row == 4:
-            num_buttons_on_row = 0
-            result.append(row_result)
-            row_result = []
-        elif idx == len(label_list) - 1:
-            result.append(row_result)
-    return result
-
-def add_next_button(func: list):
-    result = func
-    result.append([{
-                "action":{
-                        "type":"text",
-                        "label":"Далее"
-                        }
-                }])
-    return result
-
-# dict_age = {'min_age' : int}
+# Проверка возраста
 def age_verification(dict_age:dict, min_age:int=None):
     if min_age and list(dict_age.keys())[0] == 'max_age':
         if dict_age['max_age'] >= min_age:
@@ -104,8 +58,8 @@ def age_verification(dict_age:dict, min_age:int=None):
             return True
         else:
             return False 
-    
 
+# Проверка написания в строке числа    
 def checking_number_in_str(input_str:str):
     if input_str.isdigit():
         return True
@@ -114,18 +68,13 @@ def checking_number_in_str(input_str:str):
     else:
         return False
 
-
-
+# Функция получения пола пользователя
 def get_user_sex(user_id):
     sex = VKUser(user_id).find_sex()
-    # if sex == 1:
-    #     return 'fimale'
-    # elif sex == 2:
-    #     return 'male'
     return sex
 
+# Функция, возвращаяюшаяя обратный пол пользователя
 def opposite_sex(user_sex):
-    print('user_sex', user_sex)
     if user_sex == 1:
         return '2'
     elif user_sex == 2:
@@ -139,17 +88,10 @@ def convert_data_for_message(object_vk_bot, number_person:int):
     bot_answer = f"{object_vk_bot.result['response']['items'][number_person]['first_name']} {object_vk_bot.result['response']['items'][number_person]['last_name']} \n {object_vk_bot.result['response']['items'][number_person]['src']}"
     person_photos = ''
     for photo in object_vk_bot.result['response']['items'][number_person]['top_photo']:
-        print('photo',photo)
         person_photos += f"photo{photo['user_id']}_{photo['photo_id']},"
     return {'bot_answer' : bot_answer, 'person_photos' : person_photos}
 
-
-
-# print(find_russia_cities('23890940'))
-
-
-
-
+# Функция для определения цвета кнопки бота
 def analize_color_button(color):
     if color == 'NEGATIVE':
         result = VkKeyboardColor.NEGATIVE
@@ -160,4 +102,14 @@ def analize_color_button(color):
     elif color == 'SECONDARY':
         result = VkKeyboardColor.SECONDARY
     return result
+
+# Функция определения последнего id а таблице bd
+def max_id_in_db(session, db):
+    # Определим индекс последнего элемента в db
+    max_id_in_db = session.query(func.max(db.id)).first()[0]
+    if max_id_in_db:
+        max_id = max_id_in_db + 1
+    else:
+        max_id = 1
+    return max_id
     
