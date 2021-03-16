@@ -35,6 +35,17 @@ class TestVKUser:
         test_user = VKUser(test_id, search=search_dict)
         assert test_user.search_people_by_users_search()['response']['count'] == 10
 
+    def test_search_people_by_users_search_with_save(self):
+        search_dict = {
+                'sex' : 1,
+                'status' : 6,
+                'age_from' : 25,
+                'age_to' : 30,
+                'city' : 1
+            }
+        test_user = VKUser(test_id, search=search_dict)
+        assert test_user.search_people_by_users_search_with_save()['result']['response']['count'] == 10
+    
     def test_get_person_url(self):
         test_user = VKUser(test_id)
         assert test_user.get_person_url('23890940') == f'https://vk.com/id23890940'
@@ -106,7 +117,7 @@ class TestVkBot:
                 'city' : 2
             }
         test_vk_bot = VkBot(test_id)
-        assert test_vk_bot.search_people(search_dict)['response']['count'] == 10
+        assert test_vk_bot.search_people(search_dict)['result']['response']['count'] == 10
 
     def test_new_message_exception(self):
         test_vk_bot = VkBot(test_id)
@@ -133,7 +144,7 @@ class TestVkBot:
                 'city' : 2
             }
         test_vk_bot.control_questions = 100
-        test_vk_bot.result = test_vk_bot.search_people(search_dict)
+        test_vk_bot.result = test_vk_bot.search_people(search_dict)['result']
         test_vk_bot.show_matched_pair('Привет')
         assert test_vk_bot.control_questions == 101
         assert test_vk_bot.person_count == 1
@@ -154,18 +165,6 @@ class TestVkBot:
         test_keyboard.add_button('Начать поиск заново', VkKeyboardColor.NEGATIVE)
         assert result['keyboard'] == test_keyboard.get_keyboard()
 
-    def test_get_removable_urls(self):
-        search_dict = {
-                'sex' : 1,
-                'status' : 1,
-                'age_from' : 18,
-                'age_to' : 19,
-                'city' : 2
-            }
-        test_vk_bot = VkBot(test_id)
-        test_vk_bot.result = test_vk_bot.search_people(search_dict)
-        test_vk_bot.get_removable_urls()
-        assert len(test_vk_bot.removable_urls) == 10
     
     def test_add_table_to_bd(self):
         test_vk_bot = VkBot(test_id)
@@ -174,6 +173,7 @@ class TestVkBot:
         assert test_vk_bot.add_table_to_bd() == False
 
     def test_find_user_in_bd(self):
+        # После первого поиска
         test_vk_bot = VkBot(test_id)
         Session = sessionmaker(bind=engine)
         session = Session()
