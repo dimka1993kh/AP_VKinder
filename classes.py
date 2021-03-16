@@ -22,6 +22,7 @@ class VKUser():
         self.api_get_friends = 'https://api.vk.com/method/friends.get' 
         self.api_urls_search_in_friends = 'https://api.vk.com/method/friends.search'  
         self.search = search
+        self.search_counter = 0
     # Запишем параметры для конкретного запроса
         self.params_get = {
             'user_ids' :  f'{self.user_id}', 
@@ -121,6 +122,49 @@ class VKUser():
         print(result)
         return result
 
+    # НОВЫЙ МЕТОД ПОИСКА
+    def search_people_by_users_search_with_save(self, result_all=None):
+        # Поиск подходящих людей по всему интернету, не объективен
+        if not result_all:
+            search_result = requests.get(self.api_urls_search, params=self.params_search)
+            search_result.raise_for_status()
+            search_result = search_result.json()
+        else:
+            search_result = result_all
+        result = self.filter_result(search_result)
+        return {'result' : result['result'], 'new_list_person' : result['new_list_person'], 'result_all' : search_result}
+    
+    def filter_result(self, input_result):
+        count = 0
+        count_all = 0
+        result = {'response': {'count' : count, 'items' : []}}
+        info_list = ['first_name', 'last_name', 'country', 'city', 'src', 'top_photo']
+        for idx, person in enumerate(input_result['response']['items']):
+            count_all = idx + 1
+            url = self.get_person_url(person['id'])
+            photo = self.get_top_photo(person['id'])
+            if photo == False:
+                continue
+            else:
+                if count < 10:
+                    person_result = {}
+                    for el in info_list:
+                        if el == 'src':
+                            person_result[el] = url
+                        elif el == 'top_photo':
+                            person_result[el] = photo
+                        elif el in person.keys():
+                            person_result[el] = person[el]
+                    count += 1
+                    result['response']['items'].append(person_result)
+                else:
+                    break
+        result['response']['count'] = len(result['response']['items'])
+        new_list_person = {'response': {'count' : 0, 'items' : []}}
+        new_list_person['response']['items'] = input_result['response']['items'][count_all + 1:]
+        new_list_person['response']['count'] = len(new_list_person['response']['items'])
+        return {'result' : result, 'new_list_person' : new_list_person}
+
     # Метод получения ссылки на профиль
     def get_person_url(self, person_id):
         url_part = 'https://vk.com/id'
@@ -129,7 +173,7 @@ class VKUser():
     
     # Метод получения фотографий определенного пользователя
     def get_top_photo(self, user_id):
-        time.sleep(0.5)
+        time.sleep(0.3)
         print('get_top_photo')
         result = []
         additional_params = {'owner_id' : user_id}
@@ -143,8 +187,6 @@ class VKUser():
             for photo in photos[:3]:
                 result.append({'user_id' : user_id, 'photo_id': photo['id'] ,'src' : photo['sizes'][-1]['url']})
         return result
-
-        # Поиск всех городов
     
     # Метод поиска города
     def search_cities(self, params):
@@ -244,7 +286,7 @@ class VkBot:
                 result.append('8')
         return result
     # Метод, который осуществляет поиск пар
-    def search_people(self, search_dict:dict=None):
+    def search_people(self, search_dict:dict=None, result_all=None):
         if not search_dict:
             search_dict = {
                 'sex' : self.answers['sex'],
@@ -256,7 +298,8 @@ class VkBot:
         # Поиск по друзьям друзей
         # result = VKUser(self._USER_ID, search_dict).search_pepople()
         # Поиск по всему ВК
-        result = VKUser(self._USER_ID, search_dict).search_people_by_users_search(self.removable_urls)
+        user = VKUser(self._USER_ID, search_dict)
+        result = user.search_people_by_users_search_with_save(result_all=result_all)
         return result
     # Метод возвращения исключения
     def new_message_exception(self):
@@ -302,11 +345,7 @@ class VkBot:
         self.control_questions += 1
         self.person_count += 1
 
-        return {'bot_answer' : bot_answer, 'person_photos' : person_photos, 'keyboard' : keyboard}
-    # Метод получения пользователей, которых мы будем исключать из повторного поиска
-    def get_removable_urls(self):
-        for person in self.result['response']['items']:
-            self.removable_urls.append(person['src'])   
+        return {'bot_answer' : bot_answer, 'person_photos' : person_photos, 'keyboard' : keyboard} 
     # Добавим таблицы в базу данных
     def add_table_to_bd(self):
         # Инициализируем схему
@@ -354,7 +393,7 @@ class VkBot:
             result_search = VkinderResult(id=max_id_result, user_id=max_id_user, first_name=person['first_name'], last_name=person['last_name'], link=person['src'], photo_1=photos[0], photo_2=photos[1], photo_3=photos[2])
             session.add(result_search)
         session.commit()
-
+        
     # Метод, позволяющий написать пользователя сообщение
     def new_message(self, message):
         
@@ -380,8 +419,9 @@ class VkBot:
 
             # Начнем поиск людей
             # Функция search_people ищет пользователей по всему ВК
-            self.result = self.search_people()
-            self.get_removable_urls()
+            search_result = self.search_people(result_all=self.result_all)
+            self.result = search_result['result']
+            self.result_all = search_result['new_list_person']
             self.write_to_bd()
 
             # Зададим вопрос
@@ -465,8 +505,11 @@ class VkBot:
 
                 # Начнем поиск людей
                 # Функция search_people ищет пользователей по всему ВК
-                self.result = self.search_people()
-                self.get_removable_urls()
+
+                search_result = self.search_people()
+                self.result = search_result['result']
+                self.result_all = search_result['new_list_person']
+                # self.get_removable_urls()
                 self.write_to_bd()
 
                 # Создадим клавиатуру
@@ -631,8 +674,9 @@ class VkBot:
 
                 # Начнем поиск людей
                 # Функция search_people ищет пользователей по всему ВК
-                self.result = self.search_people()
-                self.get_removable_urls()
+                search_result = self.search_people()
+                self.result = search_result['result']
+                self.result_all = search_result['new_list_person']
                 self.write_to_bd()
 
 
